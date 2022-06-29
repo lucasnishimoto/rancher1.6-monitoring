@@ -1,0 +1,43 @@
+version: '2'
+networks:
+  net:
+    external:
+      name: dev-network
+services:
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: always
+    ports:
+      - 3000:3000
+    networks:
+      - net
+  influxdb:
+    image: influxdb:1.8
+    container_name: influxdb
+    restart: always
+    volumes: 
+    - /etc/influxdb/scripts:/docker-entrypoint-initdb.d 
+    ports:
+      - 8086:8086
+    networks:
+      - net
+    environment:
+      - INFLUXDB_DB=teste
+      - INFLUXDB_USER=teste
+      - INFLUXDB_ADMIN_ENABLED=true
+      - INFLUXDB_ADMIN_USER=teste
+      - INFLUXDB_ADMIN_PASSWORD=teste
+  mariadb:
+    image: mariadb:10.2
+    container_name: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: teste
+      MYSQL_DATABASE: teste
+      MYSQL_USER: teste
+      MYSQL_PASSWORD: teste
+    ports:
+      - 3306:3306
+    networks:
+      - net
+    restart: on-failure
