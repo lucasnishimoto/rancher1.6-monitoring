@@ -1,10 +1,10 @@
 ### Funcionalidade
-```
+```sh
     - Metrica de Host (Ativos, inativos, atualizando);
     - Metrica de Serviços (Ativos, inativos, atualizando, rollback);
 ```
 ### Variaveis de ambiente
-```
+```sh
     Rancher/MySQL:
       - MYSQL_DATABASE
       - MYSQL_USER
@@ -18,7 +18,7 @@
 ```
 ### Funções que tem que ter no mariadb
 ================= FUNCTION IMAGE =======================================
-
+```
 CREATE DEFINER=`root`@`localhost` FUNCTION  `json_image`(
 details TEXT,
 required_field VARCHAR (255)
@@ -46,10 +46,10 @@ RETURN TRIM(
     )
 ) ;
 END
-
+```
 
 ======================================= FUNCITION EXTRACT =======================================
-
+```
 CREATE DEFINER=`root`@`localhost` FUNCTION  `json_extract`(
 details TEXT,
 required_field VARCHAR (255)
@@ -77,3 +77,4 @@ RETURN TRIM(
     )
 ) ;
 END
+```
