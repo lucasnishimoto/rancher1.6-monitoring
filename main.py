@@ -1,6 +1,9 @@
-import mysql.connector, os, time, schedule
+import mysql.connector
+import os
+import schedule
+from icecream import ic
 from mysql.connector import Error
-from influxdb import InfluxDBClient  
+from influxdb import InfluxDBClient
 
 variaveis = dict(
     MYSQL_HOST=os.environ.get('MYSQL_HOST'),
@@ -13,69 +16,76 @@ variaveis = dict(
     ENVIRONMENT=os.environ.get('ENVIRONMENT')
 )
 
-con = mysql.connector.connect(host=variaveis['MYSQL_HOST'],database=variaveis['MYSQL_DATABASE'],user=variaveis['MYSQL_USER'],password=variaveis['MYSQL_PASSWORD'])
-client = InfluxDBClient(host=variaveis['INFLUXDB_HOST'],port=variaveis['INFLUXDB_PORT'], database=variaveis['INFLUXDB_DB'])
+con = mysql.connector.connect(host=variaveis['MYSQL_HOST'], database=variaveis['MYSQL_DATABASE'],
+                              user=variaveis['MYSQL_USER'], password=variaveis['MYSQL_PASSWORD'])
+client = InfluxDBClient(host=variaveis['INFLUXDB_HOST'],
+                        port=variaveis['INFLUXDB_PORT'], database=variaveis['INFLUXDB_DB'])
 
-##############################################HOST########################################################################
 
 def host():
-  try:
-      consulta_sql = "SELECT json_image(data, '$.hostname'), json_image(data, '$.agentIpAddress') FROM host"
-      cursor = con.cursor()
-      cursor.execute(consulta_sql)
-      linhas = cursor.fetchall()
-      print("Número total de registros retornados: ", cursor.rowcount)
-      print("\nMostrando os hosts cadastrados")
-      for linha in linhas:
-          print("Hostname:", linha[0])
-          print("IP:", linha[1], "\n")
-      for linha in linhas:
-        data = [{
-             "measurement": "host",
-            "fields": {
-                  "Ambiente": variaveis['ENVIRONMENT']
-             },
-            "tags": {
-              'Hostname': linha[0],
-              'Ips': linha[1]
-            }
-        }]
-        client.write_points(data) 
-  except Error as e:
-      print("Erro ao acessar tabela MySQL", e)
-##############################################SERVICE########################################################################
-def service():
-  try:
-      consulta_sql = "SELECT name, state, health_state, json_image(data, '$.imageUuid') FROM service;"
-      cursor = con.cursor()
-      cursor.execute(consulta_sql)
-      linhas = cursor.fetchall()
-      print("Número total de registros retornados: ", cursor.rowcount)
-      print("\nMostrando os serviços cadastrados")
-      for linha in linhas:
-        print('Name:', linha[0])
-        print('State:', linha[1])
-        print('Health_state:', linha[2])
-        print('Image:', linha[3])
-      for linha in linhas:
-        data = [{
-             "measurement": "service",
-             "tags": {
-                  'Name': linha[0],
-                  'State': linha[1],
-                  'Health_state': linha[2],
-                  'Image': linha[3],
-             },
-             "fields": {
-                  "Ambiente": variaveis['ENVIRONMENT']
-             }
-        }]
-        client.write_points(data) 
-  except Error as e:
-      print("Erro ao acessar tabela MySQL", e)
+    try:
+        consulta_sql = "SELECT state AS Status, json_image(data, '$.hostname') AS Hostname, json_image(data, '$.agentIpAddress') AS IP FROM host"
+        cursor = con.cursor()
+        cursor.execute(consulta_sql)
+        linhas = cursor.fetchall()
+        print(f'Número total de registros retornados: , {cursor.rowcount}')
+        print(f'\nMostrando os hosts cadastrados')
 
-schedule.every(1).minutes.do(host)
-schedule.every(1).minutes.do(service)
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+        for linha in linhas:
+            data = [{
+                "measurement": "rancher_host",
+                "tags": {
+                    "Ambiente": variaveis['ENVIRONMENT']
+                },
+                "fields": {
+                    'State': linha[0],
+                    'Hostname': linha[1],
+                    'IP': linha[2]
+                }
+            }]
+            ic(data)
+            client.write_points(data)
+    except Error as e:
+        print(f'Erro ao acessar tabela MySQL, {e}')
+######################################################################################################################
+
+
+def service():
+    try:
+        consulta_sql = "select service.name, account.name as environment, service.state as state, \
+      service.health_state, json_image(service.data, '$.imageUuid') as Image from service 	inner join \
+      environment on service.environment_id = environment.ID inner join account on environment.account_id = account.id group by state, environment;"
+        cursor = con.cursor()
+        cursor.execute(consulta_sql)
+        linhas = cursor.fetchall()
+        print(f'Número total de registros retornados: , {cursor.rowcount}')
+        print(f'\nMostrando os serviços cadastrados')
+        for linha in linhas:
+            data = [{
+                "measurement": "rancher_service",
+                "fields": {
+                    'Name': linha[0],
+                    'Environment': linha[1],
+                    'State': linha[2],
+                    'Health_state': linha[3],
+                    'Image': linha[4],
+                },
+                "tags": {
+                    "Ambiente": variaveis['ENVIRONMENT']
+                }
+            }]
+            ic(data)
+            client.write_points(data)
+    except Error as e:
+        print(f'Erro ao acessar tabela MySQL, {e}')
+
+
+def main():
+    schedule.every(0.9).minutes.do(host)
+    schedule.every(0.9).minutes.do(service)
+    while True:
+        schedule.run_pending()
+
+
+if __name__ == '__main__':
+    main()
